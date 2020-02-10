@@ -1,0 +1,307 @@
+2.1
+2.2
+2.3
+2.4 Extract features
+range
+
+scatter(features.AspectRatio,features.Duration)
+
+gscatter(features.AspectRatio,features.Duration,features.Character) %color map
+
+2.5 Build a Model
+load featuredata.mat
+features
+testdata
+knnmodel=fitcknn(features,"Character") %k-nearest neighbor(kNN)model 
+predictions=predict(knnmodel,testdata)
+knnmodel=fitcknn(features,"Character","NumNeighbors",5)
+predictions=predict(knnmodel,testdata)
+
+2.6 Evaluate the Model
+iscorrect=predictions==testdata.Character
+accuracy=sum(iscorrect)/numel(predictions)
+iswrong=predictions~=testdata.Character
+misclassrate=sum(iswrong)/numel(iswrong)
+
+%wrong!
+confusionchart(predictions.Character,testdata.Character)
+%right
+confusionchart(testdata.Character,predictions)
+
+2.7 Review
+
+3.1 Organization of Data Files
+3.2 Creating Datastores
+letterds=datastore("*_M_*.txt") % make a datastore to all files containing the letter M.
+data=read(letterds) %Using the read function the first time will import the data from the first file. Using it a second time will import the data from the second file, and so on.
+plot(data.X,data.Y)
+data=read(letterds)
+plot(data.X,data.Y)
+data=readall(letterds) %all data
+plot(data.X,data.Y)
+
+3.3 Adding a Data Transformation
+%  do something with data to define a function called scale
+function data = scale(data)
+    data.Time = (data.Time - data.Time(1))/1000;
+    data.X = 1.5*data.X;
+end
+To use a function as an input to another function, create a function handle by adding the @ symbol to the beginning of the function name.
+preprocds=transform(letterds,@scale)
+%
+data=readall(preprocds)
+plot(data.Time,data.Y)
+
+%normalize
+function data = scale(data)
+    data.X = data.X - mean(data.X);
+    data.Y = data.Y - mean(data.Y);
+end
+
+%NaN You can use the "omitnan" option to have statistical functions like mean ignore missing values.
+function data = scale(data)
+    data.X = data.X - mean(data.X,"omitnan");
+    data.Y = data.Y - mean(data.Y,"omitnan");
+end
+
+4.1 Types of Signals
+4.2 Calculating Summary Statistics
+%Use the range function to calculate the aspect ratio of the letter b1 by dividing the range of values of Y by the range of values of X.
+aratiob=range(b1.Y)/range(b1.X)
+%Use the median function to calculate the median of b1.X and b1.Y.
+medxb=median(b1.X,"omitnan")
+medyb=median(b1.Y,"omitnan")
+%Use the mad function to calculate the mean absolute deviation of b1.X and b1.Y.
+%Note that mad ignores NaNs by default.
+devxb=mad(b1.X)
+devyb=mad(b1.Y)
+
+aratiov=range(v1.Y)/range(v1.X)
+medxd=median(d1.X,"omitnan")
+medyd=median(d1.Y,"omitnan")
+devxm=mad(m1.X)
+devym=mad(m1.Y)
+
+4.3 Finding Peaks
+load sampleletters.mat
+plot(m1.Time,m1.X)
+
+idxmin=islocalmin(m1.X)
+idxmax=islocalmax(m1.X)
+
+plot(m1.Time,m1.X)
+hold on
+plot(m1.Time(idxmin),m1.X(idxmin),"o")
+plot(m1.Time(idxmax),m1.X(idxmax),"s")
+hold off
+
+% Determine the prominence values for islocalmin(m1.X).
+[idx,prom]=islocalmin(m1.X)
+plot(m1.Time,prom)
+
+idxmin=islocalmin(m1.X,"MinProminence",0.1)
+idxmax=islocalmax(m1.X,"MinProminence",0.1)
+
+% idx = islocalmin(x,"MinProminence",threshvalue)
+When choosing a threshold value, note that prominence values can range from 0 to range(x).
+idxmin=islocalmin(m1.X,"MinProminence",0.1)
+idxmax=islocalmax(m1.X,"MinProminence",0.1)
+plot(m1.Time,m1.X)
+hold on
+plot(m1.Time(idxmin),m1.X(idxmin),"o")
+plot(m1.Time(idxmax),m1.X(idxmax),"s")
+hold off
+
+4.4 Computing Derivatives
+load sampleletters.mat
+plot(m2.Time,m2.X)
+grid
+The diff function calculates the difference between successive elements of an array.
+dX=diff(m2.X)
+dT=diff(m2.Time)
+dXdT=dX./dT % wrong:dXdT=dX/dT
+% Plot dXdT as a function of m2.Time, excluding the final value. 
+plot(m2.Time(1:end-1),dXdT)
+dY=diff(m2.Y)
+dT=diff(m2.Time)
+dYdT=dY./dT
+maxdx=max(dXdT)
+maxdy=max(dYdT)
+% Use the standardizeMissing function to modify dYdT so that all values of Inf are now NaN.
+dYdT=standardizeMissing(dYdT,Inf)
+% You can pass a vector of values to standardizeMissing to deal with multiple missing values at once.
+xclean = standardizeMissing(x,[-Inf 0 Inf]);
+
+4.5 Calculating Correlations
+C=corr(v2.X,v2.Y)
+% Because both variables contain missing data, C is NaN. You can use the "Rows" option to specify how to avoid missing values.
+C=corr(v2.X,v2.Y,"Rows","complete")
+%Use concatenation ([ ]) to make a matrix M with four columns:
+M=[v2.X(1:11),v2.Y(1:11),v2.X(12:22),v2.Y(12:22)]
+% Use the corr function to calculate the correlations between the columns of M.
+Cmat=corr(M,"Rows","complete")
+
+4.6 Automating Feature Extraction
+(1/2) Creating a Feature Extraction Function
+load sampleletters.mat
+letter = b1;
+
+aratio = range(letter.Y)/range(letter.X)
+idxmin = islocalmin(letter.X,"MinProminence",0.1);
+numXmin = nnz(idxmin)
+idxmax = islocalmax(letter.Y,"MinProminence",0.1);
+numYmax = nnz(idxmax)
+dT = diff(letter.Time);
+dXdT = diff(letter.X)./dT;
+dYdT = diff(letter.Y)./dT;
+avgdX = mean(dXdT,"omitnan")
+avgdY = mean(dYdT,"omitnan")
+corrXY = corr(letter.X,letter.Y,"rows","complete")
+featurenames = ["AspectRatio","NumMinX","NumMinY","AvgU","AvgV","CorrXY"];
+%You can use the table function to combine separate variables into a table.
+feat=table(aratio,numXmin,numYmax,avgdX,avgdY,corrXY)
+% Recreate the table of features, feat, but with the table variable names stored in the array featurenames.
+feat=table(aratio,numXmin,numYmax,avgdX,avgdY,corrXY,'VariableNames',featurenames)
+% Add a local function called extract that takes a single variable, letter, as input and returns a table of features, feat, as output. 
+function feat=extract(letter)
+aratio = range(letter.Y)/range(letter.X)
+idxmin = islocalmin(letter.X,"MinProminence",0.1);
+numXmin = nnz(idxmin)
+idxmax = islocalmax(letter.Y,"MinProminence",0.1);
+numYmax = nnz(idxmax)
+dT = diff(letter.Time);
+dXdT = diff(letter.X)./dT;
+dYdT = diff(letter.Y)./dT;
+avgdX = mean(dXdT,"omitnan")
+avgdY = mean(dYdT,"omitnan")
+corrXY = corr(letter.X,letter.Y,"rows","complete")
+
+featurenames = ["AspectRatio","NumMinX","NumMinY","AvgU","AvgV","CorrXY"];
+feat=table(aratio,numXmin,numYmax,avgdX,avgdY,corrXY,'VariableNames',featurenames)
+end
+
+featB2=extract(b2)
+
+(2/2) Extracting Features from Multiple Data Files
+local function
+function data = scale(data)
+% Normalize time [0 1]
+data.Time = (data.Time - data.Time(1))/(data.Time(end) - data.Time(1));
+% Fix aspect ratio
+data.X = 1.5*data.X;
+% Center X & Y at (0,0)
+data.X = data.X - mean(data.X,"omitnan");
+data.Y = data.Y - mean(data.Y,"omitnan");
+% Scale to have bounding box area = 1
+scl = 1/sqrt(range(data.X)*range(data.Y));
+data.X = scl*data.X;
+data.Y = scl*data.Y;
+end
+
+function feat = extract(letter)
+% Aspect ratio
+aratio = range(letter.Y)/range(letter.X);
+% Local max/mins
+idxmin = islocalmin(letter.X,"MinProminence",0.1);
+numXmin = nnz(idxmin);
+idxmax = islocalmax(letter.Y,"MinProminence",0.1);
+numYmax = nnz(idxmax);
+% Velocity
+dT = diff(letter.Time);
+dXdT = diff(letter.X)./dT;
+dYdT = diff(letter.Y)./dT;
+avgdX = mean(dXdT,"omitnan");
+avgdY = mean(dYdT,"omitnan");
+% Correlation
+corrXY = corr(letter.X,letter.Y,"rows","complete");
+% Put it all together into a table
+featurenames = ["AspectRatio","NumMinX","NumMinY","AvgU","AvgV","CorrXY"];
+feat = table(aratio,numXmin,numYmax,avgdX,avgdY,corrXY,'VariableNames',featurenames);
+end
+
+letterds = datastore("*.txt");
+preprocds = transform(letterds,@scale)
+%Use the transform function to apply the extract function to the datastore preprocds. Store the result in a variable called featds.
+featds=transform(preprocds,@extract)
+%Use the readall function to read, preprocess, and extract features from all the data files. Store the result in a variable called data.
+data=readall(featds)
+%Visualize the imported data by making a scatter plot of AspectRatio on the x-axis and CorrXY on the y-axis.
+scatter(data.AspectRatio,data.CorrXY)
+%Use the extractBetween function to obtain the known letter names from the file names by looking for text between two underscore characters (_). 
+%Store the result in a variable called knownchar.
+%Recall that the file names are stored in the Files property of the datastore letterds.
+knownchar=extractBetween(letterds.Files,"_","_")
+%For classification problems, you typically want to represent the known label as a categorical variable. You can use the categorical function to convert an array to categorical type.
+knownchar=categorical(knownchar)
+%Add knownchar to the table data as a new variable called Character.
+data.Character=knownchar
+%Use the gscatter function to make a grouped scatter plot of AspectRatio on the x-axis and CorrXY on the y-axis, grouped by Character.
+gscatter(data.AspectRatio,data.CorrXY,data.Character) %
+
+5.1 Trainning and Testing Data
+5.2
+5.3 Training a Model
+load letterdata.mat
+traindata
+%Use the histogram function to make a histogram of the known letter classes (stored in the Character variable of the table traindata).
+histogram(traindata.Character)
+%Use the boxplot function to make a boxplot of the values of the MADX feature (mean absolute deviation of the horizontal position) for each letter. The known letter classes are stored in the variable called Character
+boxplot(traindata.MADX,traindata.Character)
+5.4 Making Predictions
+load letterdata.mat
+traindata
+knnmodel = fitcknn(traindata,"Character","NumNeighbors",5,"Standardize",true,"DistanceWeight","squaredinverse");
+testdata
+%The MAT-file letterdata.mat contains traindata, the table of data used to train the model knnmodel. It also contains testdata which is a table of data (with the same features as traindata) that the model has never seen before.
+%Use the predict function to obtain the model's predictions for the test data. Store the result in a variable called predLetter
+predLetter=predict(knnmodel,testdata)
+iswrong=predLetter~=testdata.Character
+misclassrate=sum(iswrong)/numel(predLetter)
+%Use the loss function to determine the test data loss for the kNN model knnmodel. Store the result in a variable called testloss.
+testloss=loss(knnmodel,testdata)
+%You can calculate the loss on any data set where the correct class is known. Try to determine the loss of the original training data (traindata). This is known as the resubstitution loss (the loss when the training data is “resubstituted” into the model). You can calculate resubstitution loss directly with resubLoss(knnmodel).
+
+5.5 Investigating Misclassifications
+load letterdata.mat
+load predmodel.mat
+testdata
+predLetter
+confusionchart(testdata.Character,predLetter);
+%Recreate the confusion chart with normalized row summary information.
+confusionchart(testdata.Character,predLetter,"RowSummary","row-normalized")
+falseneg=(testdata.Character=="U")&(predLetter~="U")
+%Use the logical array falseneg as an index into testfiles to determine the file names of the observations that were incorrectly classified as the letter U. Store the result in a variable called fnfiles.
+%Similarly, use falseneg as an index into predLetter to determine the associated predicted letters. Store the result in a variable called fnpred.
+fnfiles=testfiles(falseneg)
+fnpred=predLetter(falseneg)
+%Use the readtable to import the data in the fourth element of fnfiles into a table called badU. Visualize the letter by plotting Y against X.
+badU=readtable(fnfiles(4))
+plot(badU.X,badU.Y)
+
+5.5(2/2) Investigating Features
+load letterdata.mat
+load predmodel.mat
+traindata
+testdata
+predLetter
+%Use logical indexing to extract the training data for just the letters N and U. Store the result in a table called UorN.
+idx = (traindata.Character == "N") | (traindata.Character == "U");
+UorN = traindata(idx,:)
+%Similarly, extract the test data where the letter U was misclassified (i.e., the false negatives for U). Store the result in a table called fnU
+idx = (testdata.Character == "U") & (predLetter ~= "U");
+fnU = testdata(idx,:)
+%Use the removecats function to remove unused categories from UorN.Character.
+UorN.Character=removecats(UorN.Character)
+%Extract the numeric feature data from UorN and fnU into matrices called UorNfeat and fnUfeat, respectively.
+UorNfeat=UorN{:,1:end-1}
+fnUfeat=fnU{:,1:end-1}
+%To compare the feature values of different classes, use the "Group" option.
+parallelcoords(data,"Group",classes)
+parallelcoords(UorNfeat,"Group",UorN.Character)
+parallelcoords(UorNfeat,"Group",UorN.Character)
+%Use the plot function to add the values of the features for the fourth misclassified U to the plot as a black line. (The features for the misclassified letters are stored in the matrix fnUfeat).
+
+hold on
+plot(fnUfeat(4,:),'k')
+hold off
+
